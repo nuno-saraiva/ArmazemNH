@@ -823,7 +823,7 @@ select.input{appearance:auto;cursor:pointer;}
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
           <strong style="font-size:13px;">Linhas</strong><span id="orderLineCount" style="font-size:11px;color:var(--muted)">0</span>
         </div>
-        <div style="overflow-x:auto;"><table class="tbl" id="orderLinesTable" data-resizable-cols><thead><tr><th>EAN</th><th>SKU</th><th>Qty</th><th>Stock</th><th></th></tr></thead><tbody id="orderLinesBody"></tbody></table></div>
+        <div style="overflow-x:auto;"><table class="tbl" id="orderLinesTable" data-resizable-cols><thead><tr><th>EAN</th><th>SKU</th><th>Produto</th><th>Qty</th><th>Stock</th><th></th></tr></thead><tbody id="orderLinesBody"></tbody></table></div>
       </div>
     </div>
   </div>
@@ -927,7 +927,7 @@ select.input{appearance:auto;cursor:pointer;}
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
           <strong style="font-size:13px;">Artigos</strong><span id="returnLineCount" style="font-size:11px;color:var(--muted)">0</span>
         </div>
-        <div style="overflow-x:auto;"><table class="tbl" id="returnLinesTable" data-resizable-cols><thead><tr><th>EAN</th><th>SKU</th><th>Qty</th><th>Stock</th><th></th></tr></thead><tbody id="returnLinesBody"></tbody></table></div>
+        <div style="overflow-x:auto;"><table class="tbl" id="returnLinesTable" data-resizable-cols><thead><tr><th>EAN</th><th>SKU</th><th>Produto</th><th>Qty</th><th>Stock</th><th></th></tr></thead><tbody id="returnLinesBody"></tbody></table></div>
       </div>
     </div>
   </div>
@@ -1472,7 +1472,7 @@ function productMatches(d,q){
 function skuPill(sku){
   const i=skuInfo(sku);
   if(!i) return '<span class="mono" style="font-size:11px;color:var(--muted)">—</span>';
-  return `<span class="sku-pill"><span class="sku-pname">${i.name}</span><span class="sku-pbrand">${i.brand}</span>${i.ml?`<span class="badge bdg-sk" style="font-size:10px">${i.ml}</span>`:''}</span>`;
+  return `<span class="sku-pill"><span class="sku-pname">${escHtml(i.name)}</span><span class="sku-pbrand">${escHtml(i.brand)}</span>${i.ml?`<span class="badge bdg-sk" style="font-size:10px">${escHtml(i.ml)}</span>`:''}</span>`;
 }
 function productLineLabel(sku) {
   const info = skuInfo(sku);
@@ -2885,13 +2885,13 @@ function renderDocLines(t){
   const ce=t==='order'?'orderLineCount':'returnLineCount',be=t==='order'?'orderLinesBody':'returnLinesBody';
   document.getElementById(ce).textContent=`${doc.lines.length} SKUs · ${doc.lines.reduce((a,l)=>a+l.qty,0)} unid.`;
   const body=document.getElementById(be);
-  if(!doc.lines.length){body.innerHTML=`<tr><td colspan="5"><div class="empty" style="padding:12px;">Sem linhas.</div></td></tr>`;enableResizableTables();return;}
+  if(!doc.lines.length){body.innerHTML=`<tr><td colspan="6"><div class="empty" style="padding:12px;">Sem linhas.</div></td></tr>`;enableResizableTables();return;}
   body.innerHTML=doc.lines.map(l=>{
     const info=skuInfo(l.sku);
     const av=stockTotalForSku(l.sku);
     const ab=t==='order'?(av===0?`<span class="badge bdg-rd">0</span>`:av<l.qty?`<span class="badge bdg-or">${av}</span>`:`<span class="badge bdg-gn">${av}</span>`):`<span class="badge bdg-bl">${av}</span>`;
     return `<tr><td class="mono" style="color:var(--muted)">${info?.ean||'—'}</td><td class="mono" style="font-weight:700">${l.sku}</td>
-      <td><input class="input qty-in" type="number" min="1" value="${l.qty}" onchange="updDocQty('${t}','${l.sku}',this.value)"></td>
+      <td>${skuPill(l.sku)}</td><td><input class="input qty-in" type="number" min="1" value="${l.qty}" onchange="updDocQty('${t}','${l.sku}',this.value)"></td>
       <td>${ab}</td><td><button class="btn btn-ghost btn-sm" onclick="rmDocLine('${t}','${l.sku}')">✕</button></td></tr>`;
   }).join('');
   enableResizableTables();
