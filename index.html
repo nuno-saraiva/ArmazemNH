@@ -2896,14 +2896,45 @@ function renderDocLines(t){
   }).join('');
   enableResizableTables();
 }
+function parseDocImportRows(rows) {
+  const normHeader = v => normSearch(String(v || '')).replace(/[^a-z0-9]/g, '');
+  const qtyHeaders = new Set(['quantidade','qty','qtd','quantity','qtypedida','qtdpedida','quantidadepedida']);
+  const headerIndex = rows.findIndex(row => {
+    const h = (row || []).map(normHeader);
+    return h.some(v => v === 'ean' || v === 'sku' || v === 'skuouean') && h.some(v => qtyHeaders.has(v));
+  });
+  let start = 0, codeCol = 0, qtyCol = 1;
+  if (headerIndex >= 0) {
+    const h = (rows[headerIndex] || []).map(normHeader);
+    codeCol = h.indexOf('ean');
+    if (codeCol < 0) codeCol = h.indexOf('skuouean');
+    if (codeCol < 0) codeCol = h.indexOf('sku');
+    qtyCol = h.findIndex(v => qtyHeaders.has(v));
+    start = headerIndex + 1;
+  }
+  const out = [];
+  for (let i = start; i < rows.length; i++) {
+    const row = rows[i] || [];
+    const rawCode = String(row[codeCol] || '').trim();
+    const qty = parseInt(row[qtyCol], 10);
+    const codeKey = normHeader(rawCode);
+    if (!rawCode || !Number.isFinite(qty) || qty <= 0) continue;
+    if (['ean','sku','skuouean','posicao','estado'].includes(codeKey)) continue;
+    const sku = resolveSku(rawCode);
+    if (sku) out.push({sku, qty});
+  }
+  return out;
+}
 function importDocLines(t){
   const file=document.getElementById(t==='order'?'orderFile':'returnFile').files[0];if(!file)return;
   const r=new FileReader();
   r.onload=e=>{
     const wb=XLSX.read(e.target.result,{type:'array'});
     const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
-    rows.forEach((row,i)=>{if(i===0&&isNaN(row[1]))return;const sku=resolveSku(String(row[0]||'').trim());const qty=parseInt(row[1])||1;if(sku)_addLine(t,sku,qty);});
-    toast('Importado','win');
+    const lines = parseDocImportRows(rows);
+    if(!lines.length){toast('Nenhuma linha valida encontrada no Excel','err');return;}
+    lines.forEach(l=>_addLine(t,l.sku,l.qty));
+    toast(lines.length+' linhas importadas','win');
   };r.readAsArrayBuffer(file);
 }
 function dlDocTpl(t){
