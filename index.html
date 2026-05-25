@@ -696,6 +696,7 @@ select.input{appearance:auto;cursor:pointer;}
     <div class="card-header"><span class="card-title" data-i="card_catalog">Catálogo</span>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <input class="input input-sans" id="dbSearch" placeholder="Pesquisar..." style="width:180px;padding:5px 10px;font-size:12px;" oninput="renderSkuDb()">
+        <button class="btn btn-ghost btn-sm" onclick="exportSkuDbExcel()" data-tip="Exportar toda a base de dados geral para Excel">⬇ Excel</button>
         <button class="btn btn-ghost btn-sm" onclick="clearSkuDb()" data-tip="Apagar todo o catálogo de produtos">🗑 Limpar</button>
       </div>
     </div>
@@ -1684,6 +1685,18 @@ function clearSkuDb(){if(!confirm(`Apagar ${skuDb.length} produtos?`))return;if(
 function dlSkuTpl(){
   const ws=XLSX.utils.aoa_to_sheet([['SKU','EAN','Nome','Marca','Categoria','ML'],['SKU-001','3614273123456','Teint Idole Ultra','Lancôme','Base','30ml'],['SKU-002','3605532000001','Rouge Allure','Chanel','Batom','3.5g']]);
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'SKUs');XLSX.writeFile(wb,'template_skus.xlsx');
+}
+function exportSkuDbExcel(){
+  if(!skuDb.length){toast('Base de dados vazia','err');return;}
+  const rows=[['SKU','EAN','Nome','Marca','Categoria','ML']];
+  skuDb.slice().sort((a,b)=>String(a.sku||'').localeCompare(String(b.sku||''))).forEach(d=>{
+    rows.push([d.sku||'',d.ean||'',d.name||'',d.brand||'',d.category||'',d.ml||'']);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Base Dados');
+  XLSX.writeFile(wb,'base_dados_geral.xlsx');
+  toast('Base de dados exportada','win');
 }
 
 // ══ STOCK TABLE ══
