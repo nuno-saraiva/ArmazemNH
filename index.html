@@ -2815,14 +2815,33 @@ function exportDocExcel(t,id){
   if(!doc){toast('Documento não encontrado','err');return;}
   const isOrder=t==='order';
   const title=(isOrder?'Pedido':'Devolução')+': '+doc.id+(doc.client?' — '+doc.client:'');
-  const rows=[[title],['Estado: '+(doc.status||'—')+' · Criado por: '+(doc.createdBy||'—')+' · '+(doc.createdAt||'—')],[],['EAN','SKU','Nome','Marca','ML','Quantidade','Stock real']];
-  doc.lines.forEach(l=>{
-    const i=skuInfo(l.sku);
-    const real=stockTotalForSku(l.sku);
-    rows.push([i?.ean||'',l.sku,i?.name||'',i?.brand||'',i?.ml||'',l.qty,real]);
-  });
+  const rows=[[title],['Estado: '+(doc.status||'—')+' · Criado por: '+(doc.createdBy||'—')+' · '+(doc.createdAt||'—')],[]];
+  if(isOrder){
+    const requested = aggregateGuideLines(doc.lines || []);
+    const billed = doc.guide?.lines?.length
+      ? aggregateGuideLines(doc.guide.lines.filter(l=>l.status==='confirmed').map(l=>({sku:l.sku, qty:parseInt(l.qtyDone)||parseInt(l.qty)||0})))
+      : [];
+    const billedMap = Object.fromEntries(billed.map(l=>[resolveSku(l.sku), parseInt(l.qty)||0]));
+    rows.push(['EAN','SKU','Nome','Marca','ML','Qtd pedida','Qtd faturada','Diferença']);
+    requested.forEach(l=>{
+      const sku = resolveSku(l.sku);
+      const i=skuInfo(sku);
+      const asked=parseInt(l.qty)||0;
+      const invoiced=billedMap[sku]||0;
+      rows.push([i?.ean||(/^\d{8,}$/.test(sku)?sku:''),i?.sku||sku,i?.name||'',i?.brand||'',i?.ml||'',asked,invoiced,asked-invoiced]);
+    });
+  } else {
+    rows.push(['EAN','SKU','Nome','Marca','ML','Quantidade','Stock real']);
+    doc.lines.forEach(l=>{
+      const i=skuInfo(l.sku);
+      const real=stockTotalForSku(l.sku);
+      rows.push([i?.ean||'',l.sku,i?.name||'',i?.brand||'',i?.ml||'',l.qty,real]);
+    });
+  }
   const ws=XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols']=[{wch:16},{wch:16},{wch:32},{wch:18},{wch:8},{wch:12},{wch:12}];
+  ws['!cols']=isOrder
+    ? [{wch:16},{wch:16},{wch:34},{wch:18},{wch:8},{wch:12},{wch:14},{wch:12}]
+    : [{wch:16},{wch:16},{wch:32},{wch:18},{wch:8},{wch:12},{wch:12}];
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,isOrder?'Pedido':'Devolucao');
   XLSX.writeFile(wb,safeFileName(doc.id)+'.xlsx');toast('Excel exportado','win');
 }
