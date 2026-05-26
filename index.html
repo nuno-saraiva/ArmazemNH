@@ -1711,6 +1711,11 @@ function aggregateGuideLines(lines) {
   });
   return Object.entries(map).map(([sku, qty]) => ({sku, qty}));
 }
+function confirmedLineQty(line) {
+  const done = parseInt(line?.qtyDone);
+  if (Number.isFinite(done)) return Math.max(0, done);
+  return Math.max(0, parseInt(line?.qty) || 0);
+}
 
 function calcStockMetrics() {
   // Returns {sku: {carteira, emPrep, faturado, devPedidas, devPrep, devFeitas}}
@@ -1720,7 +1725,7 @@ function calcStockMetrics() {
   // ORDERS
   orders.forEach(o => {
     const orderLines = (['picked','parcial'].includes(o.status) && o.guide?.lines?.length)
-      ? aggregateGuideLines(o.guide.lines.filter(g => g.status === 'confirmed').map(g => ({sku:g.sku, qty:g.qtyDone || g.qty})))
+      ? aggregateGuideLines(o.guide.lines.filter(g => g.status === 'confirmed').map(g => ({sku:g.sku, qty:confirmedLineQty(g)})))
       : (o.lines || []);
     orderLines.forEach(l => {
       ensure(l.sku);
@@ -1740,7 +1745,7 @@ function calcStockMetrics() {
     if (r.status === 'returned') {
       const confirmed = r.putawayGuide?.lines?.filter(g=>g.status==='confirmed') || [];
       const doneLines = confirmed.length
-        ? aggregateGuideLines(confirmed.map(g => ({sku:g.sku, qty:g.qtyDone || g.qty})))
+        ? aggregateGuideLines(confirmed.map(g => ({sku:g.sku, qty:confirmedLineQty(g)})))
         : (r.lines || []);
       doneLines.forEach(l => { ensure(l.sku); m[l.sku].devFeitas += parseInt(l.qty)||0; });
     }
@@ -1786,7 +1791,7 @@ function calcStockPositionMetrics() {
     if (['picked','parcial'].includes(o.status)) {
       o.guide.lines.forEach(l => {
         if (l.status !== 'confirmed') return;
-        addStockPositionMetric(metrics, findStockRowForMovement(l), 'faturado', parseInt(l.qtyDone)||parseInt(l.qty)||0);
+        addStockPositionMetric(metrics, findStockRowForMovement(l), 'faturado', confirmedLineQty(l));
       });
     }
   });
@@ -1820,7 +1825,7 @@ function calcStockPositionMetrics() {
     }
     if (r.status === 'returned') {
       (r.putawayGuide?.lines || []).forEach(l => {
-        if (l.status === 'confirmed') addStockPositionMetric(metrics, findStockRowForMovement(l), 'devFeitas', parseInt(l.qtyDone)||parseInt(l.qty)||0);
+        if (l.status === 'confirmed') addStockPositionMetric(metrics, findStockRowForMovement(l), 'devFeitas', confirmedLineQty(l));
       });
     }
   });
@@ -2819,7 +2824,7 @@ function exportDocExcel(t,id){
   if(isOrder){
     const requested = aggregateGuideLines(doc.lines || []);
     const billed = doc.guide?.lines?.length
-      ? aggregateGuideLines(doc.guide.lines.filter(l=>l.status==='confirmed').map(l=>({sku:l.sku, qty:parseInt(l.qtyDone)||parseInt(l.qty)||0})))
+      ? aggregateGuideLines(doc.guide.lines.filter(l=>l.status==='confirmed').map(l=>({sku:l.sku, qty:confirmedLineQty(l)})))
       : [];
     const billedMap = Object.fromEntries(billed.map(l=>[resolveSku(l.sku), parseInt(l.qty)||0]));
     rows.push(['EAN','SKU','Nome','Marca','ML','Qtd pedida','Qtd faturada','Diferença']);
@@ -5539,7 +5544,7 @@ function returnableLinesForOrder(order) {
   if (order.guide?.lines?.length) {
     const confirmed = order.guide.lines
       .filter(l => l.status === 'confirmed')
-      .map(l => ({sku:l.sku, qty:parseInt(l.qtyDone)||parseInt(l.qty)||0}));
+      .map(l => ({sku:l.sku, qty:confirmedLineQty(l)}));
     if (confirmed.length) return aggregateGuideLines(confirmed);
   }
   return aggregateGuideLines(order.lines || []);
